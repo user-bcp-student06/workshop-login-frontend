@@ -1,4 +1,8 @@
-export function formatTaskLabel(task: any): string {
+import { Task } from '../models/task.model';
+
+export function formatTaskLabel(
+  task: Partial<Pick<Task, 'priority' | 'owner'>> | null | undefined
+): string {
   if (!task) {
     return 'SIN-DATOS';
   }
