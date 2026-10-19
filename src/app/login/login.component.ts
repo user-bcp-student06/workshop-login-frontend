@@ -6,6 +6,8 @@ import { AuthService } from '../services/auth.service';
 import { SessionService, UserPreferences } from '../services/session.service';
 import { LoginRequest } from '../models/auth.model';
 
+const LOGIN_ERROR_MESSAGE = 'No se pudo autenticar. Verifica tus credenciales e intenta de nuevo.';
+
 @Component({
   selector: 'app-login',
   standalone: true,
@@ -51,12 +53,16 @@ export class LoginComponent {
         this.message = 'El backend respondió sin token.';
         return;
       }
+      if (typeof response.token !== 'string') {
+        this.message = LOGIN_ERROR_MESSAGE;
+        return;
+      }
 
       this.session.setSession(response.token, response.user || {});
       this.session.savePreferences(this.preferences);
       await this.router.navigate(['/dashboard']);
     } catch {
-      this.message = 'No se pudo autenticar. Verifica tus credenciales e intenta de nuevo.';
+      this.message = LOGIN_ERROR_MESSAGE;
     } finally {
       this.busy = false;
     }

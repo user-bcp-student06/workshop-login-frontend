@@ -14,7 +14,7 @@ describe('LoginComponent characterization', () => {
   };
   const router = { navigate: vi.fn().mockResolvedValue(true) } as unknown as Router;
   let session: SessionService;
-  const auth = { login: vi.fn() } as unknown as AuthService;
+  const auth = { login: vi.fn<AuthService['login']>() };
 
   beforeEach(() => {
     values.clear();
@@ -247,8 +247,11 @@ describe('LoginComponent characterization', () => {
     expect(component.preferences).toEqual({ theme: 'light', showTips: true, compact: false });
   });
 
-  it.fails('BUG-T01: rejects a truthy non-string token instead of creating a session', async () => {
-    vi.mocked(auth.login).mockResolvedValue({ token: 123 } as never);
+  it.each([
+    { token: 123 as unknown }, { token: true as unknown },
+    { token: {} as unknown }, { token: [] as unknown }
+  ])('BUG-T01: rejects a truthy non-string token: $token', async ({ token }) => {
+    vi.mocked(auth.login).mockResolvedValue({ token } as never);
     const component = new LoginComponent(router, session, auth);
     component.username = 'student';
     component.password = 'invalid';
@@ -256,6 +259,28 @@ describe('LoginComponent characterization', () => {
     await component.login();
 
     expect(session.getToken()).toBeNull();
+    expect(session.getUser()).toBeNull();
+    expect(storage.setItem).not.toHaveBeenCalled();
     expect(router.navigate).not.toHaveBeenCalled();
+    expect(component.message).toBe('No se pudo autenticar. Verifica tus credenciales e intenta de nuevo.');
+    expect(component.busy).toBe(false);
+  });
+
+  it('BUG-T01: preserves the previous session when the returned token has an invalid type', async () => {
+    const previousUser = { username: 'previous-student' };
+    session.setSession('previous-fake-token', previousUser);
+    vi.mocked(auth.login).mockResolvedValue({ token: 123, user: { username: 'student' } } as never);
+    const component = new LoginComponent(router, session, auth);
+    component.username = 'student';
+    component.password = 'invalid';
+
+    await component.login();
+
+    expect(session.getToken()).toBe('previous-fake-token');
+    expect(session.getUser()).toEqual(previousUser);
+    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalled();
+    expect(component.busy).toBe(false);
+    expect(component.message).toBe('No se pudo autenticar. Verifica tus credenciales e intenta de nuevo.');
   });
 });

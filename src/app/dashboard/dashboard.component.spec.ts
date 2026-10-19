@@ -17,7 +17,7 @@ describe('DashboardComponent characterization', () => {
   const changeDetector = { detectChanges: vi.fn() } as unknown as ChangeDetectorRef;
   const zone = { run: (callback: () => void) => callback() } as unknown as NgZone;
   let session: SessionService;
-  const tasksService = { getTasks: vi.fn() } as unknown as TasksService;
+  const tasksService = { getTasks: vi.fn<TasksService['getTasks']>() };
 
   beforeEach(() => {
     values.clear();
@@ -165,11 +165,39 @@ describe('DashboardComponent characterization', () => {
     const component = new DashboardComponent(router, changeDetector, zone, session, tasksService);
 
     expect(component.statusLabel(status)).toBe(expected);
+    expect(component.statusValue(status)).toBe(status);
+    expect(component.statusValue(status).toLowerCase()).toBe(status.toLowerCase());
   });
 
-  it.fails('BUG-T02: handles a non-string status without a rendering exception', () => {
+  it.each([
+    { status: 123 as unknown }, { status: true as unknown },
+    { status: {} as unknown }, { status: [] as unknown },
+    { status: null as unknown }, { status: undefined as unknown }
+  ])('BUG-T02: handles non-string status $status with an empty label', ({ status }) => {
     const component = new DashboardComponent(router, changeDetector, zone, session, tasksService);
 
-    expect(() => component.statusLabel(123 as unknown as string)).not.toThrow();
+    expect(() => component.statusLabel(status)).not.toThrow();
+    expect(component.statusLabel(status)).toBe('');
+    expect(component.statusValue(status)).toBe('');
+    expect('pill-' + component.statusValue(status).toLowerCase()).toBe('pill-');
+  });
+
+  it('BUG-T02: loads a task with numeric status and presents an empty label and safe CSS value', async () => {
+    session.setSession('fake-token', { username: 'student' });
+    vi.mocked(tasksService.getTasks).mockResolvedValue([
+      { title: 'Unexpected status', status: 123, priority: 'high', owner: 'student' }
+    ] as never);
+    const component = new DashboardComponent(router, changeDetector, zone, session, tasksService);
+
+    await component.ngOnInit();
+
+    expect(component.loading).toBe(false);
+    expect(component.error).toBe('');
+    expect(component.visibleTasks).toHaveLength(1);
+    const task = component.visibleTasks[0];
+    expect(task.title).toBe('Unexpected status');
+    expect(task.label).toBe('HIGH · STUDENT');
+    expect(component.statusLabel(task.status)).toBe('');
+    expect('pill-' + component.statusValue(task.status).toLowerCase()).toBe('pill-');
   });
 });

@@ -46,7 +46,7 @@ Fuentes: `src/app/models/auth.model.ts`, `src/app/services/auth.service.ts` y lo
 
 | Campo JSON | Tipo declarado | Uso en el cliente |
 |---|---|---|
-| `token` | `string`, opcional en la interfaz | Necesario en la práctica para continuar. No se comprueban formato, firma ni expiración. |
+| `token` | `string`, opcional en la interfaz | Necesario en la práctica para continuar: debe ser un string truthy. Se rechazan valores truthy de otro tipo antes de crear sesión. No se comprueban formato, firma ni expiración; no se recorta el contenido. |
 | `user` | `SessionUser`, opcional | Usuario de sesión en memoria. Si falta o es falsy, se usa `{}`. |
 | `user.username` | `string`, opcional | Query `owner` de tareas y nombre alternativo para el saludo. |
 | `user.displayName` | `string`, opcional | Nombre preferido para el saludo del dashboard. |
@@ -67,7 +67,7 @@ Fuentes: `src/app/models/auth.model.ts`, `src/app/services/session.service.ts`, 
 
 ### 4. Cómo reacciona ante errores
 
-Durante la petición, `busy=true`: el botón se deshabilita y muestra «Ingresando...». El bloque `finally` restablece `busy=false` al terminar, incluso si hay error.
+Durante la petición, `busy=true`: el botón se deshabilita y muestra «Ingresando...». El bloque `finally` restablece el estado del componente a `busy=false` al terminar, incluso si hay error. Limitación visual observada con respuesta local simulada: ante token numérico el componente termina con busy=false y mensaje genérico, pero la vista puede seguir mostrando «Ingresando...» sin mensaje hasta una nueva detección de cambios. Véase T06 en `docs/TESTING.md`; no se corrigió en H-08.
 
 | Caso | Reacción de UI y sesión |
 |---|---|
@@ -78,7 +78,8 @@ Durante la petición, `busy=true`: el botón se deshabilita y muestra «Ingresan
 | Red, CORS, servicio caído u otro rechazo de la promesa | El mismo mensaje; no muestra el cuerpo ni el detalle interno del error. |
 | Objeto de respuesta sin `token`, vacío o falsy | «El backend respondió sin token.»; no crea una nueva sesión ni navega al dashboard. |
 | Cuerpo nulo/indefinido u otra estructura que lanza al acceder a `token` | Se captura la excepción y se muestra el mensaje genérico. No hay validación de esquema. |
-| Token truthy pero inválido, expirado o con tipo incorrecto | El login no lo detecta: guarda el valor y navega al dashboard. Si tareas lo rechaza, se aplica el comportamiento del endpoint siguiente. |
+| Token truthy de tipo incorrecto (número, booleano, objeto o array) | Se rechaza antes de crear/reemplazar sesión, persistir preferencias o navegar. El componente establece el mensaje genérico y busy=false; la actualización inmediata del DOM tiene la limitación T06 descrita arriba. |
+| Token string truthy pero inválido o expirado | No se verifica su validez: guarda el valor sin modificarlo y navega al dashboard. Si tareas lo rechaza, se aplica el comportamiento del endpoint siguiente. |
 | `user` ausente | No es un error para el cliente: usa `{}`; luego consulta con `owner=` y el saludo puede carecer de nombre. |
 | Error al guardar preferencias o rechazo de navegación tras guardar sesión | Se muestra el mensaje genérico. No se revierte la sesión ya guardada en memoria. |
 
@@ -154,7 +155,7 @@ La UI muestra «First», etiqueta `HIGH · STUDENT` y estado «Por hacer»; no s
 
 Se excluye solo `status === 'ARCHIVED'`, sensible a mayúsculas. El resto recibe una etiqueta de prioridad (mayúsculas o `NORMAL` si es falsy) y propietario, separados por ` · `. El orden usa `first.priority > second.priority ? -1 : 1`: es lexicográfico, no una escala semántica de prioridad; para las cadenas `low` y `high` del test, `low` va primero. El comparador no retorna cero para prioridades iguales.
 
-El mapa de estados visibles es: `TODO` → «Por hacer», `IN_PROGRESS` → «En progreso», `DONE` → «Completado», `RESUELTO` → «Resuelto», `COMPLETED` → «Completado». La búsqueda convierte a mayúsculas y conserva el texto original para estados desconocidos. No se infiere que ese mapa sea el enum completo del backend.
+El mapa de estados visibles es: `TODO` → «Por hacer», `IN_PROGRESS` → «En progreso», `DONE` → «Completado», `RESUELTO` → «Resuelto», `COMPLETED` → «Completado». La búsqueda convierte a mayúsculas y conserva el texto original para strings desconocidos. `statusValue(unknown)` devuelve el string original o `''` si no es string, y se reutiliza en la etiqueta y la clase CSS. Los estados no textuales muestran etiqueta vacía y clases `pill pill-`, sin convertir números u objetos a texto. No se infiere que ese mapa sea el enum completo del backend.
 
 Fuentes: `src/app/models/task.model.ts`, `src/app/dashboard/dashboard.component.ts`, `src/app/dashboard/dashboard.component.html`, `src/app/utils/legacy-format.ts` y `src/app/dashboard/dashboard.component.spec.ts`.
 
@@ -172,7 +173,7 @@ Mientras la consulta está pendiente, `loading=true` y se muestran placeholders.
 | Objeto contenedor, `null` o valor sin `.filter()` | El procesamiento lanza dentro del `try`: muestra el mensaje genérico, sin lista y con `loading=false`. |
 | Array con elementos nulos que fallan al acceder a `status` | También termina en el mensaje genérico. |
 | Campos ausentes/mal tipados que no lanzan al procesar | No hay validación de esquema: pueden mostrarse valores vacíos, fallbacks u orden inesperado. |
-| `status` truthy que no sea string | Puede fallar en `.toLowerCase()` o `statusLabel` durante renderizado. El `catch` de carga no garantiza capturar errores posteriores de plantilla; no hay recuperación específica. |
+| `status` que no sea string | Se conserva la tarea y se normaliza solo su presentación: etiqueta vacía y clase `pill-`, sin excepción de conversión en esos bindings. No se modifica el filtro ARCHIVED ni se valida el resto del esquema. Verificado en DOM local con respuestas simuladas. |
 
 El botón «Cerrar sesión» llama a `logout()`, limpia token/usuario en memoria y navega a `/login`; conserva preferencias. No llama a un endpoint de logout ni revoca el token en el backend. No hay botón de reintento de tareas en la plantilla: «Intenta de nuevo» no dispara otra petición por sí mismo.
 
@@ -184,7 +185,7 @@ Fuentes: `src/app/dashboard/dashboard.component.ts` y `src/app/dashboard/dashboa
 
 - El bearer procede del servicio de sesión en memoria. La comprobación local es solo de presencia; la validación de firma, caducidad y permisos corresponde al servidor.
 - Codificar `owner` evita que sus caracteres alteren la query, pero no demuestra autorización. El filtro es controlado desde el cliente; no se puede afirmar aislamiento entre usuarios sin verificar el backend.
-- Los títulos, descripciones, etiquetas y errores se interpolan sin `[innerHTML]` ni bypass del sanitizador. `status` también participa en una clase CSS, sin validación de esquema en ejecución.
+- Los títulos, descripciones, etiquetas y errores se interpolan sin `[innerHTML]` ni bypass del sanitizador. El valor de presentación de `status` se limita a string o vacío antes de construir su clase CSS; esto no es validación general del esquema ni un enum de estados permitidos.
 - Los errores ya no exponen `response.data.detail` ni mensajes internos. Un 401 conserva sesión local hasta logout o recarga.
 - HTTP local no cifra el bearer con TLS. La sesión en memoria no impide el uso de credenciales por un XSS activo.
 

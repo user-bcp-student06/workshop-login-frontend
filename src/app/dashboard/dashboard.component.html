@@ -22,7 +22,7 @@
       <div class="task-meta">{{ task.label }}</div>
       <h2>{{ task.title }}</h2>
       <p>{{ task.description }}</p>
-      <span class="pill" [class]="'pill-' + (task.status || '').toLowerCase()">{{ statusLabel(task.status) }}</span>
+      <span class="pill" [class]="'pill-' + statusValue(task.status).toLowerCase()">{{ statusLabel(task.status) }}</span>
     </article>
     <p class="empty" *ngIf="!visibleTasks.length">No hay tareas para mostrar todavía.</p>
   </section>

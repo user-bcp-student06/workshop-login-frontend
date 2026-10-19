@@ -36,8 +36,13 @@ export class DashboardComponent implements OnInit {
     private tasksService: TasksService
   ) {}
 
-  statusLabel(status: string): string {
-    return STATUS_LABELS[(status || '').toUpperCase()] || status;
+  statusValue(status: unknown): string {
+    return typeof status === 'string' ? status : '';
+  }
+
+  statusLabel(status: unknown): string {
+    const value = this.statusValue(status);
+    return STATUS_LABELS[value.toUpperCase()] || value;
   }
 
   async ngOnInit(): Promise<void> {
