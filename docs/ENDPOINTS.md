@@ -67,7 +67,7 @@ Fuentes: `src/app/models/auth.model.ts`, `src/app/services/session.service.ts`, 
 
 ### 4. Cómo reacciona ante errores
 
-Durante la petición, `busy=true`: el botón se deshabilita y muestra «Ingresando...». El bloque `finally` restablece el estado del componente a `busy=false` al terminar, incluso si hay error. Limitación visual observada con respuesta local simulada: ante token numérico el componente termina con busy=false y mensaje genérico, pero la vista puede seguir mostrando «Ingresando...» sin mensaje hasta una nueva detección de cambios. Véase T06 en `docs/TESTING.md`; no se corrigió en H-08.
+Durante la petición, `busy=true`: el botón se deshabilita y muestra «Ingresando...». El bloque `finally` restablece el estado del componente a `busy=false` al terminar, incluso si hay error, y solicita la actualización de la vista. T06 se corrigió por separado de H-08: una respuesta local con token numérico muestra el mensaje genérico y restablece el botón inmediatamente. Véase `docs/TESTING.md`.
 
 | Caso | Reacción de UI y sesión |
 |---|---|
@@ -78,7 +78,7 @@ Durante la petición, `busy=true`: el botón se deshabilita y muestra «Ingresan
 | Red, CORS, servicio caído u otro rechazo de la promesa | El mismo mensaje; no muestra el cuerpo ni el detalle interno del error. |
 | Objeto de respuesta sin `token`, vacío o falsy | «El backend respondió sin token.»; no crea una nueva sesión ni navega al dashboard. |
 | Cuerpo nulo/indefinido u otra estructura que lanza al acceder a `token` | Se captura la excepción y se muestra el mensaje genérico. No hay validación de esquema. |
-| Token truthy de tipo incorrecto (número, booleano, objeto o array) | Se rechaza antes de crear/reemplazar sesión, persistir preferencias o navegar. El componente establece el mensaje genérico y busy=false; la actualización inmediata del DOM tiene la limitación T06 descrita arriba. |
+| Token truthy de tipo incorrecto (número, booleano, objeto o array) | Se rechaza antes de crear/reemplazar sesión, persistir preferencias o navegar. El mensaje genérico aparece y el botón se habilita de nuevo; verificado en navegador con una respuesta local simulada. |
 | Token string truthy pero inválido o expirado | No se verifica su validez: guarda el valor sin modificarlo y navega al dashboard. Si tareas lo rechaza, se aplica el comportamiento del endpoint siguiente. |
 | `user` ausente | No es un error para el cliente: usa `{}`; luego consulta con `owner=` y el saludo puede carecer de nombre. |
 | Error al guardar preferencias o rechazo de navegación tras guardar sesión | Se muestra el mensaje genérico. No se revierte la sesión ya guardada en memoria. |

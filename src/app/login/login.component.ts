@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
@@ -25,7 +25,8 @@ export class LoginComponent {
   constructor(
     private router: Router,
     private session: SessionService,
-    private auth: AuthService
+    private auth: AuthService,
+    private cdr: ChangeDetectorRef
   ) {
     this.preferences = this.session.loadPreferences(this.preferences);
   }
@@ -65,6 +66,7 @@ export class LoginComponent {
       this.message = LOGIN_ERROR_MESSAGE;
     } finally {
       this.busy = false;
+      this.cdr.markForCheck();
     }
   }
 }

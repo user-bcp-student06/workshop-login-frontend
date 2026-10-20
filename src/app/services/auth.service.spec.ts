@@ -72,10 +72,13 @@ describe('AuthService contract characterization', () => {
       vi.mocked(axios.get).mockResolvedValue({ status: 200, data: [task] });
       const navigate = vi.fn().mockResolvedValue(true);
       const router = { navigate } as unknown as Router;
-      const detector = { detectChanges: vi.fn() } as unknown as ChangeDetectorRef;
+      const detector = {
+        detectChanges: vi.fn(),
+        markForCheck: vi.fn()
+      } as unknown as ChangeDetectorRef;
       const zone = { run: (callback: () => void) => callback() } as unknown as NgZone;
       const session = new SessionService();
-      const login = new LoginComponent(router, session, new AuthService());
+      const login = new LoginComponent(router, session, new AuthService(), detector);
       login.username = 'student';
       login.password = 'Workshop123!';
 

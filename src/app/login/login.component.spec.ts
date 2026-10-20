@@ -1,4 +1,5 @@
 import '@angular/compiler';
+import { ChangeDetectorRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthService } from '../services/auth.service';
@@ -13,6 +14,7 @@ describe('LoginComponent characterization', () => {
     removeItem: vi.fn((key: string) => values.delete(key))
   };
   const router = { navigate: vi.fn().mockResolvedValue(true) } as unknown as Router;
+  const cdr = { markForCheck: vi.fn() } as unknown as ChangeDetectorRef;
   let session: SessionService;
   const auth = { login: vi.fn<AuthService['login']>() };
 
@@ -33,7 +35,7 @@ describe('LoginComponent characterization', () => {
   it('sends the login request, stores the returned session and navigates', async () => {
     const user = { username: 'student', displayName: 'Student' };
     auth.login.mockResolvedValue({ token: 'fake-token', user });
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
     component.username = 'student';
     component.password = 'Workshop123!';
 
@@ -54,13 +56,13 @@ describe('LoginComponent characterization', () => {
   it('merges saved preferences over the defaults', () => {
     values.set('workshop_preferences', JSON.stringify({ compact: true }));
 
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
 
     expect(component.preferences).toEqual({ theme: 'light', showTips: true, compact: true });
   });
 
   it('shows a validation message and skips the request when username is empty', async () => {
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
     component.password = 'Workshop123!';
 
     await component.login();
@@ -70,7 +72,7 @@ describe('LoginComponent characterization', () => {
   });
 
   it('shows a validation message and skips the request when password is empty', async () => {
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
     component.username = 'student';
 
     await component.login();
@@ -80,7 +82,7 @@ describe('LoginComponent characterization', () => {
   });
 
   it('treats whitespace-only credentials as empty', async () => {
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
     component.username = '   ';
 
     await component.login();
@@ -91,7 +93,7 @@ describe('LoginComponent characterization', () => {
 
   it('shows a message when the response does not contain a token', async () => {
     auth.login.mockResolvedValue({ user: { username: 'student' } });
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
     component.username = 'student';
     component.password = 'Workshop123!';
 
@@ -103,7 +105,7 @@ describe('LoginComponent characterization', () => {
 
   it('does not expose the submitted username or server error in the message', async () => {
     auth.login.mockRejectedValue(new Error('internal server detail'));
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
     component.username = 'student';
     component.password = 'invalid';
 
@@ -117,7 +119,7 @@ describe('LoginComponent characterization', () => {
 
   it('does not expose markup-like backend details to the user', async () => {
     auth.login.mockRejectedValue({ response: { data: { message: '<em>fake detail</em>' } } });
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
     component.username = '<student>';
     component.password = 'invalid';
 
@@ -137,7 +139,7 @@ describe('LoginComponent characterization', () => {
     ['timeout', { code: 'ECONNABORTED', message: 'timeout of 5000ms exceeded' }]
   ])('handles %s without leaking details or navigating', async (_name, error) => {
     vi.mocked(auth.login).mockRejectedValue(error);
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
     component.username = 'student';
     component.password = 'invalid';
 
@@ -155,7 +157,7 @@ describe('LoginComponent characterization', () => {
     vi.mocked(auth.login).mockImplementation(() => new Promise((_resolve, reject) => {
       setTimeout(() => reject({ code: 'ECONNABORTED' }), 5000);
     }));
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
     component.username = 'student';
     component.password = 'invalid';
 
@@ -172,7 +174,7 @@ describe('LoginComponent characterization', () => {
 
   it.each([undefined, null])('handles unexpected response %s safely', async (response) => {
     vi.mocked(auth.login).mockResolvedValue(response);
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
     component.username = 'student';
     component.password = 'invalid';
 
@@ -186,7 +188,7 @@ describe('LoginComponent characterization', () => {
   it.each([{}, { token: '' }, { token: null }, { token: false }])(
     'does not create a session for a missing or falsy token: %j', async (response) => {
       vi.mocked(auth.login).mockResolvedValue(response as never);
-      const component = new LoginComponent(router, session, auth);
+      const component = new LoginComponent(router, session, auth, cdr);
       component.username = 'student';
       component.password = 'invalid';
 
@@ -200,7 +202,7 @@ describe('LoginComponent characterization', () => {
   );
 
   it('rejects a whitespace-only password without sending HTTP', async () => {
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
     component.username = 'student';
     component.password = '   ';
 
@@ -212,7 +214,7 @@ describe('LoginComponent characterization', () => {
 
   it('accepts a token without user data using the documented empty user fallback', async () => {
     vi.mocked(auth.login).mockResolvedValue({ token: 'fake-token' });
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
     component.username = 'student';
     component.password = 'Workshop123!';
 
@@ -229,7 +231,7 @@ describe('LoginComponent characterization', () => {
     } else {
       vi.mocked(router.navigate).mockRejectedValueOnce(new Error('navigation rejected'));
     }
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
     component.username = 'student';
     component.password = 'Workshop123!';
 
@@ -242,7 +244,7 @@ describe('LoginComponent characterization', () => {
   it('falls back to default preferences when stored JSON is corrupt', () => {
     values.set('workshop_preferences', '{');
 
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
 
     expect(component.preferences).toEqual({ theme: 'light', showTips: true, compact: false });
   });
@@ -252,7 +254,7 @@ describe('LoginComponent characterization', () => {
     { token: {} as unknown }, { token: [] as unknown }
   ])('BUG-T01: rejects a truthy non-string token: $token', async ({ token }) => {
     vi.mocked(auth.login).mockResolvedValue({ token } as never);
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
     component.username = 'student';
     component.password = 'invalid';
 
@@ -270,7 +272,7 @@ describe('LoginComponent characterization', () => {
     const previousUser = { username: 'previous-student' };
     session.setSession('previous-fake-token', previousUser);
     vi.mocked(auth.login).mockResolvedValue({ token: 123, user: { username: 'student' } } as never);
-    const component = new LoginComponent(router, session, auth);
+    const component = new LoginComponent(router, session, auth, cdr);
     component.username = 'student';
     component.password = 'invalid';
 

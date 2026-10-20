@@ -9,9 +9,9 @@ Suite local Vitest en entorno Node y comprobación DOM adicional en navegador in
 - H-08: cinco pruebas rojas ordinarias confirmaron aceptación de tokens mal tipados y sobrescritura de sesión; después de la guarda de tipo pasan 36/36 pruebas enfocadas de login/autenticación.
 - H-09: seis pruebas rojas ordinarias confirmaron excepciones/fallback incorrecto; después de la normalización compartida y el caso de tarea numérica pasan 40/40 pruebas enfocadas de dashboard/tareas.
 - Suite completa final: 79/79 pruebas ordinarias, sin it.fails, skip ni todo; código de salida 0.
-- Cobertura global: 87.93% de líneas/sentencias, 95% de ramas y 90.9% de funciones. Login y dashboard: 100% de líneas; ramas 100% y 95%, respectivamente. Supera el 85% requerido sin exclusiones nuevas.
-- Build Angular: código de salida 0. DOM de H-09 y login válido/logout: verificados con respuestas locales simuladas.
-- Prueba visual del mensaje de rechazo H-08: falló por la desactualización de la vista T06. El componente sí rechazó el token y terminó con busy=false y mensaje genérico; no se afirma que la UI de error completa esté corregida.
+- Cobertura global actual: 88.03% de líneas/sentencias, 95% de ramas y 90.9% de funciones. Login y dashboard: 100% de líneas; ramas 100% y 95%, respectivamente. Supera el 85% requerido sin exclusiones nuevas.
+- Build Angular: código de salida 0. DOM de H-09, login válido/logout y el retest de T06: verificados con respuestas locales simuladas.
+- T06 fue aprobado e implementado por separado el 2026-10-20; evidencia del retest visual y alcance en la sección de comprobación DOM.
 
 ## Matriz de pruebas
 
@@ -217,12 +217,13 @@ Comando del servidor desde el directorio anterior: `npm start -- --port 4300`. A
 | Comprobación | Resultado real |
 |---|---|
 | Primer intento de automatización | Herramienta devolvió Page not found; se reabrió la página y se confirmó acceso antes de ejecutar aserciones. No fue una prueba de aplicación. |
-| Login con token numérico simulado | La espera del mensaje visible agotó 10000 ms. Inspección de la instancia Angular: busy=false y mensaje genérico; DOM todavía con «Ingresando...» y sin nodo de mensaje. Fallo visual T06, no marcado como aprobado. |
+| Login con token numérico simulado (baseline previo a T06) | La espera del mensaje visible agotó 10000 ms. Inspección de la instancia Angular: busy=false y mensaje genérico; DOM todavía con «Ingresando...» y sin nodo de mensaje. Resultado histórico que motivó T06. |
+| Retest T06, token numérico simulado en `http://localhost:4301` | Mensaje genérico visible; botón muestra «Ingresar» y está habilitado; permanece en `/login`. La API de autenticación fue interceptada con Playwright y no se contactó ningún backend. |
 | Login válido simulado → dashboard | Navegación correcta con token ficticio y usuario student. |
 | Ocho tarjetas: status 123, true, objeto, array, null, ausente, TODO y CUSTOM | Las seis primeras tienen texto de estado vacío y clases `pill pill-`; TODO conserva «Por hacer»/`pill-todo`; CUSTOM conserva «CUSTOM»/`pill-custom`. Aserciones DOM aprobadas. |
 | Logout | Navega a login; sin errores de página capturados durante la comprobación exitosa de dashboard/logout. |
 
-La prueba H-09 verificó `article.task`, título, texto del `.pill` y su className en el navegador, no solo los métodos de la clase. La prueba de rechazo de login se reporta fallida aunque sus regresiones unitarias aprueben. No se forzó detectChanges manualmente para aparentar un éxito visual.
+La prueba H-09 verificó `article.task`, título, texto del `.pill` y su className en el navegador, no solo los métodos de la clase. El baseline DOM fallido de T06 se conserva como evidencia histórica; el retest posterior confirma que la vista refleja el rechazo y libera el botón.
 
 ## Fallos y riesgos separados
 
@@ -232,13 +233,12 @@ La prueba H-09 verificó `article.task`, título, texto del `.pill` y su classNa
 - **T03, riesgo observado, no corregido:** si falla el almacenamiento de preferencias o la navegación tras autenticar, la UI muestra fallo pero la sesión ya se guardó y no se revierte. Los tests de error comprueban mensaje y busy, no convierten la sesión residual en un resultado deseable. Fuente: orden de setSession/savePreferences/navigate en LoginComponent.
 - **T04, riesgo del orden existente:** el comparador de prioridad es textual y retorna 1 incluso con prioridades iguales. La escala semántica del backend sigue abierta en ENDPOINTS.md. Se conservó la prueba previa, sin añadir una expectativa que lo presente como un orden semántico correcto.
 - **T05, límite de validación:** los tipos no validan esquema; campos ausentes/mal tipados pueden pasar sin excepción y generar UI incompleta. Los casos que sí lanzan al procesar ya están probados. No se inventó una política de rechazo que no existe.
-- **T06, defecto visual observado, no corregido:** tras respuesta de login con token numérico interceptada en el navegador, el componente tiene busy=false y mensaje genérico, pero la plantilla mantiene el botón deshabilitado «Ingresando...» y no muestra el mensaje. Evidencia: aserción DOM agotada e inspección de la instancia Angular descritas arriba. Hipótesis: actualización asíncrona fuera del mecanismo de detección de cambios; la causa no se confirmó. No se amplió H-08 para cambiar el mecanismo de renderizado sin aprobación.
+- **T06 / H-10, corregido:** el baseline confirmó que el estado del componente cambiaba sin actualizar la vista. Tras la aprobación independiente, `LoginComponent` marca el componente para revisión al terminar el login. El retest DOM con respuesta simulada confirma mensaje visible, botón habilitado y permanencia en login. No se amplió la validación a otros hallazgos.
 
-Correspondencia con el backlog: BUG-T01 corresponde a H-08 y BUG-T02 a H-09 en [HALLAZGOS.md](../HALLAZGOS.md). Esa matriz es el único lugar de seguimiento de su estado. T03–T06 son observaciones fuera del alcance aprobado; no se incorporaron automáticamente como nuevos items.
+Correspondencia con el backlog: BUG-T01 corresponde a H-08, BUG-T02 a H-09 y T06 a H-10 en [HALLAZGOS.md](../HALLAZGOS.md). Esa matriz es el único lugar de seguimiento de su estado. T03–T05 continúan fuera del alcance aprobado.
 
 ## Pendientes
 
-- Evaluar y autorizar un item independiente para la actualización visual de errores de login (T06). Las regresiones H-08/H-09 ya son tests ordinarios sin it.fails.
 - Decidir tratamiento de sesión residual (T03), validación de esquema (T05) y semántica de prioridad (T04) antes de modificar comportamiento.
 - Ampliar las comprobaciones DOM a 401, timeout y otros errores de login: el caso de rechazo por tipo de token ya evidenció T06. El renderizado de estados de tareas y login válido/logout sí se verificaron con respuestas simuladas.
 - Confirmar con los propietarios externos el esquema garantizado, códigos de estado y autorización de owner. No se leyeron otros componentes ni se hicieron peticiones reales.
